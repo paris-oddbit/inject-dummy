@@ -37,95 +37,118 @@ const dbConfigs = {
 
 let connection; // This will store the database connection
 
+/**
+ * Executes an SQL script from a given file path on a specified database type.
+ *
+ * @param {string} filePath - The path to the SQL script file.
+ * @param {string} dbType - The type of database where the SQL will be executed ('mssql' or 'mariadb').
+ * @returns {Promise<Object|void>} A promise that resolves with the execution results for 'mariadb', or void for 'mssql'.
+ */
 const executeSqlFile = async (filePath, dbType) => {
   try {
-    const sql = await fs.promises.readFile(filePath, { encoding: "utf-8" });
+    const sql = await fs.promises.readFile(filePath, "utf-8");
 
-    if (dbType === "mssql") {
-      const request = new mssql.Request();
-      const result = await request.query(sql);
-      console.log(`Executed ${filePath} successfully:`, result);
-    } else {
-      // mariadb
-      return new Promise((resolve, reject) => {
-        connection.query(sql, (err, results) => {
-          if (err) {
-            console.error("Error executing SQL:", err);
-            reject(err);
-          } else {
-            console.log(`Executed ${filePath} successfully:`, results);
-            resolve(results); // Only use resolve within the Promise constructor
-          }
+    let result;
+    switch (dbType) {
+      case "mssql":
+        const mssqlRequest = new mssql.Request();
+        result = await mssqlRequest.query(sql);
+        break;
+      case "mariadb":
+        result = await new Promise((resolve, reject) => {
+          connection.query(sql, (err, res) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve(res);
+            }
+          });
         });
-      });
+        break;
+      default:
+        throw new Error(`Database type ${dbType} is not supported`);
     }
+
+    console.log(`Executed ${filePath} successfully:`, result);
   } catch (error) {
-    console.error("Error reading SQL file:", error);
+    console.error(`Failed to execute SQL file ${filePath}:`, error);
   }
 };
 
+/**
+ * Executes a JavaScript migration script and subsequently runs the associated SQL script on the specified database.
+ *
+ * @param {string} scriptName - The name of the JavaScript migration script.
+ * @param {string} dbType - The target database type for SQL execution ('mssql' or 'mariadb').
+ * @returns {Promise<void>} A promise that resolves upon successful execution of both scripts.
+ */
 const runScript = async (scriptName, dbType) => {
   try {
-    // Await the completion of the script execution
     const { stdout, stderr } = await execPromise(`node ${scriptName}`);
-    console.log(`Output from ${scriptName}:`, stdout);
+    console.log(`Script output:`, stdout);
 
     if (stderr) {
-      console.error(`Error in script ${scriptName}:`, stderr);
+      console.error(`Script error:`, stderr);
       return;
     }
 
-    // Build the correct SQL file name based on the scriptName
-    const sqlFilename = `add_${scriptName
-      .replace("gen_", "t_")
-      .replace(".js", "")}.sql`;
-    console.log(`Attempting to execute SQL file: ${sqlFilename}`);
+    // Build the SQL filename from the JavaScript script name
+    const sqlFilename = buildSqlFilename(scriptName);
+    console.log(`Executing SQL file: ${sqlFilename}`);
+
     await executeSqlFile(sqlFilename, dbType);
   } catch (error) {
-    console.error(`Error executing script ${scriptName}:`, error);
+    console.error(`Execution error:`, error);
   }
 };
 
+/**
+ * Generates the SQL filename corresponding to the given JavaScript script name.
+ *
+ * @param {string} scriptName - The name of the JavaScript migration script.
+ * @returns {string} The built SQL filename.
+ */
+const buildSqlFilename = (scriptName) => {
+  // Transform the script name to match the SQL naming convention
+  return `add_${scriptName.replace("gen_", "t_").replace(".js", "")}.sql`;
+};
+
+/**
+ * Initializes the command-line interface to prompt the user for database configuration and script execution options.
+ */
 rl.question(
-  "Choose DB Configuration:\n1 -> MariaDB\n2 -> MS SQL\nYour choice: ",
+  "Choose DB Configuration:\n\n1 -> MariaDB\n2 -> MS SQL\n\nYour choice: ",
   async (dbChoice) => {
-    let dbType = dbChoice.trim() === "1" ? "mariadb" : "mssql";
-    let dbConfig = dbConfigs[dbType];
+    const dbType = dbChoice.trim() === "1" ? "mariadb" : "mssql";
+    const dbConfig = dbConfigs[dbType];
 
     try {
-      if (dbType === "mssql") {
-        // Connect using MS SQL
-        await mssql.connect(dbConfig);
-        console.log("Connected to MS SQL Server");
-      } else {
-        // Connect using MariaDB/MySQL
-        connection = mysql.createConnection(dbConfig);
-        connection.connect();
-        console.log("Connected to MariaDB/MySQL");
-      }
+      // Establish a connection to the chosen database
+      await connectToDatabase(dbType, dbConfig);
+      console.log(`Connected to ${dbType.toUpperCase()} server.`);
 
+      // Prompt the user for the desired operation
       rl.question(
-        "Choose an option:\n1 -> Generate and Add Access Group\n2 -> Generate and Add Door\n3 -> Generate and Add Zone\n4 -> Generate and Add All\nYour choice: ",
-        async (answer) => {
-          switch (answer.trim()) {
-            case "1":
-              await runScript("gen_acsgr.js", dbType);
-              break;
-            case "2":
-              await runScript("gen_dr.js", dbType);
-              break;
-            case "3":
-              await runScript("gen_zn.js", dbType);
-              break;
-            case "4":
-              await runScript("gen_acsgr.js", dbType);
-              await runScript("gen_dr.js", dbType);
-              await runScript("gen_zn.js", dbType);
-              break;
-            default:
-              console.log("Invalid choice!");
-              break;
+        "\nChoose an option:\n1 -> Generate and Add Access Group\n2 -> Generate and Add Door\n3 -> Generate and Add Zone\n4 -> Generate and Add All\nYour choice: ",
+        async (option) => {
+          const scriptMap = {
+            1: "gen_acsgr.js",
+            2: "gen_dr.js",
+            3: "gen_zn.js",
+          };
+
+          const selectedScript = scriptMap[option.trim()] || null;
+
+          if (selectedScript) {
+            await runScript(selectedScript, dbType);
+          } else if (option.trim() === "4") {
+            await runScript("gen_acsgr.js", dbType);
+            await runScript("gen_dr.js", dbType);
+            await runScript("gen_zn.js", dbType);
+          } else {
+            console.log("Invalid choice!");
           }
+
           rl.close();
         }
       );
@@ -136,6 +159,23 @@ rl.question(
   }
 );
 
+/**
+ * Connects to the specified database using the provided configuration.
+ *
+ * @param {string} dbType - The type of database to connect to ('mariadb' or 'mssql').
+ * @param {Object} dbConfig - The configuration object for the database connection.
+ * @returns {Promise<void>} A promise that resolves once the connection is established.
+ */
+const connectToDatabase = async (dbType, dbConfig) => {
+  if (dbType === "mssql") {
+    // Connect using MS SQL
+    await mssql.connect(dbConfig);
+  } else {
+    // Connect using MariaDB/MySQL
+    connection = mysql.createConnection(dbConfig);
+    connection.connect();
+  }
+};
 rl.on("close", () => {
   if (connection) {
     connection.end();
