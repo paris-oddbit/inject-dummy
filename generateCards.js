@@ -38,7 +38,7 @@ const cardTypes = [
 // function generateCardCollection(totalCards, cardsPerType) {
 function generateCardCollection(cardsPerType) {
   let cardCollection = { CardCollection: { rows: [] } };
-  let cardIdCounter = 1000100; // Start card ID
+  let cardIdCounter = 100030000; // Start card ID
   let wiegandFormatToggle = 1; // This will toggle between 1 and 4 for wiegand_format_id
 
   cardTypes.forEach((cardType) => {
@@ -69,22 +69,22 @@ async function sendCardCollection(sessionId) {
 
   // const totalCards = 10; // Total number of cards
   const cardsPerType = {
-    0: 2, // 2 cards of card_type id = 0
-    1: 2, // 2 cards of card_type id = 1
-    2: 2, // 2 cards of card_type id = 2
-    3: 2, // 2 cards of card_type id = 3
-    4: 2, // 2 cards of card_type id = 4
-    5: 2, // 2 cards of card_type id = 5
-    6: 2, // 2 cards of card_type id = 6
-    // 7: 2, // 2 cards of card_type id = 7 //! NOT WORKING
-    8: 2, // 2 cards of card_type id = 8
-    9: 2, // 2 cards of card_type id = 9
-    10: 2, // 2 cards of card_type id = 10
+    0: 1000, // 2 cards of card_type id = 0
+    1: 1000, // 2 cards of card_type id = 1
+    2: 1000, // 2 cards of card_type id = 2
+    3: 1000, // 2 cards of card_type id = 3
+    4: 1000, // 2 cards of card_type id = 4
+    5: 1000, // 2 cards of card_type id = 5
+    6: 1000, // 2 cards of card_type id = 6
+    // // 7: 2, // 2 cards of card_type id = 7 //! NOT WORKING
+    8: 1000, // 2 cards of card_type id = 8
+    9: 1000, // 2 cards of card_type id = 9
+    10: 1000, // 2 cards of card_type id = 10
   };
 
   // const cardCollection = generateCardCollection(totalCards, cardsPerType);
   const cardCollection = generateCardCollection(cardsPerType);
-  // console.log('Card generation data:', JSON.stringify(cardCollection, null, 2));
+  console.log('Card generation data:', JSON.stringify(cardCollection, null, 2));
 
   try {
     const response = await axios.post(apiUrl, cardCollection, {
@@ -94,10 +94,7 @@ async function sendCardCollection(sessionId) {
       },
       httpsAgent, // Attach the custom https agent to bypass SSL validation
     });
-    console.log(
-      'Card generation response:',
-      JSON.stringify(response.data, null, 2)
-    );
+    console.log('Card generation response:', response.data);
   } catch (error) {
     console.error('Error sending card generation request:', error.message);
     if (error.response) {
