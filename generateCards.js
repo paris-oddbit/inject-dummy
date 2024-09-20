@@ -4,6 +4,10 @@ const https = require('https');
 const { faker } = require('@faker-js/faker');
 const { loginAndGetSessionId } = require('./login');
 
+// Track the next available user ID globally
+let nextAvailableUserId;
+let batchSize = 0; // How many IDs left in the current batch
+
 // Create an https agent that ignores self-signed certificates
 const httpsAgent = new https.Agent({
   keepAlive: true,
@@ -140,6 +144,8 @@ async function getNextUserId(sessionId) {
     });
     const nextUserId = response.data.User.user_id; // Assuming the API returns `user_id` in the response
     console.log(`Next user ID retrieved: ${nextUserId}`);
+    nextAvailableUserId = nextUserId;
+    batchSize = 0; // Reset batch count
     return nextUserId;
   } catch (error) {
     console.error('Error fetching next user ID:', error.message);
@@ -152,11 +158,29 @@ async function getNextUserId(sessionId) {
   }
 }
 
+// Function to get the next unique user ID, fetches a new batch from the API if needed
+async function getNextUniqueUserId(sessionId, concurrencyLimit) {
+  if (batchSize === 0) {
+    await getNextUserId(sessionId); // Fetch new batch of IDs
+  }
+
+  const currentUserId = nextAvailableUserId;
+  nextAvailableUserId++;
+  batchSize++;
+
+  // If we've used all IDs in the current batch, reset the batch counter
+  if (batchSize >= concurrencyLimit) {
+    batchSize = 0;
+  }
+
+  return currentUserId;
+}
+
 // Function to create a user and assign the generated card to the user
-async function createUserWithCard(sessionId, card) {
+async function createUserWithCard(sessionId, card, concurrencyLimit) {
   const userApiUrl = `${process.env.BASE_URL}${process.env.USERS_ENDPOINT}`; // Adjust the user creation endpoint
 
-  let nextUserId = await getNextUserId(sessionId);
+  let nextUserId = await getNextUniqueUserId(sessionId, concurrencyLimit);
   const firstName = faker.person.firstName();
 
   const generateUserData = () => ({
@@ -225,15 +249,21 @@ function sleep(ms) {
 }
 
 // Function to process the creation of users and assign them to the generated cards
-async function processUsersWithCards(sessionId, createdCards) {
+async function processUsersWithCards(
+  sessionId,
+  createdCards,
+  concurrencyLimit
+) {
   // for (let card of createdCards) {
   //   await createUserWithRetry(sessionId, card);
   // }
   const { default: PQueue } = await import('p-queue'); // Dynamically import p-queue
-  const queue = new PQueue({ concurrency: 2 }); // Create queue with concurrency
+  const queue = new PQueue({ concurrency: concurrencyLimit }); // Create queue with concurrency
 
   const userCreationPromises = createdCards.map((card) => {
-    return queue.add(() => createUserWithRetry(sessionId, card)); // Add the user creation task to the queue
+    return queue.add(() =>
+      createUserWithRetry(sessionId, card, concurrencyLimit)
+    ); // Add the user creation task to the queue
   });
 
   // Wait for all user creation tasks to complete
@@ -270,24 +300,28 @@ async function createUserWithRetry(sessionId, card) {
 }
 
 // Main function to handle login, bulk card generation, and user creation (if required)
-async function generateCards(assignCards = false, blacklistCount = 0) {
+async function generateCards(
+  assignCards = false,
+  blacklistCount = 0,
+  concurrencyLimit = 5
+) {
   try {
     // Step 1: Login and get session ID
     const sessionId = await loginAndGetSessionId();
 
     // Step 2: Generate card collection for bulk creation
     const cardsPerType = {
-      0: 1000, // 1000 cards of card_type id = 0
-      1: 1000, // 1000 cards of card_type id = 1
-      2: 1000, // 1000 cards of card_type id = 2
-      3: 1000, // 1000 cards of card_type id = 3
-      4: 1000, // 1000 cards of card_type id = 4
-      5: 1000, // 1000 cards of card_type id = 5
-      6: 1000, // 1000 cards of card_type id = 6
-      // // 7: 2, // 2 cards of card_type id = 7 //! NOT WORKING
-      8: 1000, // 1000 cards of card_type id = 8
-      9: 1000, // 1000 cards of card_type id = 9
-      10: 1000, // 1000 cards of card_type id = 10
+      0: 200, // 1000 cards of card_type id = 0
+      // 1: 1000, // 1000 cards of card_type id = 1
+      // 2: 1000, // 1000 cards of card_type id = 2
+      // 3: 1000, // 1000 cards of card_type id = 3
+      // 4: 1000, // 1000 cards of card_type id = 4
+      // 5: 1000, // 1000 cards of card_type id = 5
+      // 6: 1000, // 1000 cards of card_type id = 6
+      // // // 7: 2, // 2 cards of card_type id = 7 //! NOT WORKING
+      // 8: 1000, // 1000 cards of card_type id = 8
+      // 9: 1000, // 1000 cards of card_type id = 9
+      // 10: 1000, // 1000 cards of card_type id = 10
     };
     const cardCollection = generateCardCollection(cardsPerType, cardIdCounter);
 
@@ -296,7 +330,7 @@ async function generateCards(assignCards = false, blacklistCount = 0) {
 
     // Step 4: Process cards for user creation and assignment if assignCards is true
     if (assignCards) {
-      await processUsersWithCards(sessionId, createdCards);
+      await processUsersWithCards(sessionId, createdCards, concurrencyLimit);
     }
   } catch (error) {
     console.error('Error in main process:', error.message);
@@ -307,9 +341,10 @@ async function generateCards(assignCards = false, blacklistCount = 0) {
 // First argument is the number of cards, second argument is whether to assign the cards to users
 const assignCards = true; // Change to 'false' for unassigned cards
 const blacklistCount = 100; // Number of cards to blacklist
-let cardIdCounter = 1799200; // Start card ID
+const concurrencyLimit = 5; // Limit for concurrent requests per batch
+let cardIdCounter = 1999200; // Start card ID
 
-generateCards(assignCards);
+generateCards(assignCards, blacklistCount, concurrencyLimit);
 
 //! OLD CODE
 // require('dotenv').config();
