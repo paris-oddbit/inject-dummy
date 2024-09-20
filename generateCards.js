@@ -252,7 +252,8 @@ function sleep(ms) {
 async function processUsersWithCards(
   sessionId,
   createdCards,
-  concurrencyLimit
+  concurrencyLimit,
+  blacklistCount
 ) {
   // for (let card of createdCards) {
   //   await createUserWithRetry(sessionId, card);
@@ -330,7 +331,12 @@ async function generateCards(
 
     // Step 4: Process cards for user creation and assignment if assignCards is true
     if (assignCards) {
-      await processUsersWithCards(sessionId, createdCards, concurrencyLimit);
+      await processUsersWithCards(
+        sessionId,
+        createdCards,
+        concurrencyLimit,
+        blacklistCount
+      );
     }
   } catch (error) {
     console.error('Error in main process:', error.message);
