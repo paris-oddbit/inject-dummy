@@ -38,6 +38,9 @@ Open the .env file and update the following variables with your own values:
 - BASE_URL : The base URL for the BioStar 2 API.
 - LOGIN_ENDPOINT : The login endpoint for the BioStar 2 API.
 - CARD_GENERATE_ENDPOINT : The card generation endpoint for the BioStar 2 API.
+- USERS_ENDPOINT : API for users.
+- GET_NEXT_USER_ID_ENDPOINT : API for getting next available user id.
+- CARD_BLACKLIST_ENDPOINT : API for blacklist card, only support one card at a time.
 
 ### Login Credentials
 
@@ -59,13 +62,24 @@ This will use the database inject to generate the required data.
 
 ## Step 4: Generate Cards for BioStar 2
 
-To generate cards for BioStar 2, run the following command:
+To generate assigned and/or blacklist cards for BioStar 2, run the following command:
 
 ```bash
-node generateCards.js
+node generateCards.js true
 ```
 
-This will use the BioStar 2 API to generate the required cards.
+This will use the BioStar 2 API to generate the assigned cards and blacklist certain number of cards.
+
+**\*NOTE:** You can update the number of blacklisted on [Generate Card Data](generateCards.js)
+
+To generate unassigned cards for BioStar 2, run the following command:
+
+```bash
+node generateCards.js false
+```
+
+This will use the BioStar 2 API to generate the unassigned cards.
+
 **\*NOTE:** You can update the required data on [Generate Card Data](generateCards.js)
 
 That's it! You're now ready to get started with this project.

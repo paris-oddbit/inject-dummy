@@ -36,9 +36,8 @@ const cardTypes = [
 ];
 
 // Function to generate card collection for bulk creation
-function generateCardCollection(cardsPerType) {
+function generateCardCollection(cardsPerType, cardIdCounter) {
   let cardCollection = { CardCollection: { rows: [] } };
-  let cardIdCounter = 1599200; // Start card ID
   let wiegandFormatToggle = 1; // This will toggle between 1 and 4 for wiegand_format_id
 
   cardTypes.forEach((cardType) => {
@@ -91,6 +90,44 @@ async function createCards(sessionId, cardCollection) {
   }
 }
 
+// Function to blacklist a card
+async function blacklistCard(sessionId, card) {
+  const blacklistApiUrl = `${process.env.BASE_URL}${process.env.CARD_BLACKLIST_ENDPOINT}`; // Adjust the blacklist endpoint URL
+
+  const blacklistData = {
+    Blacklist: {
+      card_id: {
+        id: card.card_id, // Use the card ID for blacklisting
+      },
+    },
+  };
+
+  try {
+    const response = await axios.post(blacklistApiUrl, blacklistData, {
+      headers: {
+        'Content-Type': 'application/json',
+        'bs-session-id': sessionId,
+      },
+      httpsAgent,
+    });
+    console.log(`Card ${card.card_id} blacklisted successfully.`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error blacklisting card ${card.card_id}:`, error.message);
+    throw error;
+  }
+}
+
+// Function to blacklist assigned cards
+async function blacklistAssignedCards(sessionId, createdCards, blacklistCount) {
+  const cardsToBlacklist = createdCards.slice(0, blacklistCount); // Select the first 'blacklistCount' cards to blacklist
+
+  for (const card of cardsToBlacklist) {
+    await blacklistCard(sessionId, card);
+  }
+
+  console.log(`${blacklistCount} cards have been blacklisted.`);
+}
 async function getNextUserId(sessionId) {
   const nextUserIdApiUrl = `${process.env.BASE_URL}${process.env.GET_NEXT_USER_ID_ENDPOINT}`;
 
@@ -202,6 +239,9 @@ async function processUsersWithCards(sessionId, createdCards) {
   // Wait for all user creation tasks to complete
   await Promise.all(userCreationPromises);
   console.log('All users have been created and assigned to cards.');
+
+  // Blacklist cards after user creation
+  await blacklistAssignedCards(sessionId, createdCards, blacklistCount);
 }
 
 // Helper function to retry the operation with exponential backoff
@@ -230,26 +270,26 @@ async function createUserWithRetry(sessionId, card) {
 }
 
 // Main function to handle login, bulk card generation, and user creation (if required)
-async function generateCards(assignCards = false) {
+async function generateCards(assignCards = false, blacklistCount = 0) {
   try {
     // Step 1: Login and get session ID
     const sessionId = await loginAndGetSessionId();
 
     // Step 2: Generate card collection for bulk creation
     const cardsPerType = {
-      0: 1000, // 2 cards of card_type id = 0
-      1: 1000, // 2 cards of card_type id = 1
-      2: 1000, // 2 cards of card_type id = 2
-      3: 1000, // 2 cards of card_type id = 3
-      4: 1000, // 2 cards of card_type id = 4
-      5: 1000, // 2 cards of card_type id = 5
-      6: 1000, // 2 cards of card_type id = 6
+      0: 1000, // 1000 cards of card_type id = 0
+      1: 1000, // 1000 cards of card_type id = 1
+      2: 1000, // 1000 cards of card_type id = 2
+      3: 1000, // 1000 cards of card_type id = 3
+      4: 1000, // 1000 cards of card_type id = 4
+      5: 1000, // 1000 cards of card_type id = 5
+      6: 1000, // 1000 cards of card_type id = 6
       // // 7: 2, // 2 cards of card_type id = 7 //! NOT WORKING
-      8: 1000, // 2 cards of card_type id = 8
-      9: 1000, // 2 cards of card_type id = 9
-      10: 1000, // 2 cards of card_type id = 10
+      8: 1000, // 1000 cards of card_type id = 8
+      9: 1000, // 1000 cards of card_type id = 9
+      10: 1000, // 1000 cards of card_type id = 10
     };
-    const cardCollection = generateCardCollection(cardsPerType);
+    const cardCollection = generateCardCollection(cardsPerType, cardIdCounter);
 
     // Step 3: Send the bulk card generation request
     const createdCards = await createCards(sessionId, cardCollection);
@@ -266,9 +306,12 @@ async function generateCards(assignCards = false) {
 // Run the main process
 // First argument is the number of cards, second argument is whether to assign the cards to users
 const assignCards = true; // Change to 'false' for unassigned cards
+const blacklistCount = 100; // Number of cards to blacklist
+let cardIdCounter = 1799200; // Start card ID
 
 generateCards(assignCards);
 
+//! OLD CODE
 // require('dotenv').config();
 // const axios = require('axios');
 // const https = require('https');
