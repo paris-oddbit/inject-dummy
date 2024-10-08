@@ -32,6 +32,7 @@ Open the .env file and update the following variables with your own values:
 - MSSQL_PASSWORD : The password for your MSSQL database.
 - MSSQL_SERVER : The server for your MSSQL database.
 - MSSQL_DATABASE : The name of your MSSQL database.
+- MSSQL_PORT : The port for your MSSQL database.
 
 ### BioStar 2 Config
 

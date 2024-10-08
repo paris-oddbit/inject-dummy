@@ -20,14 +20,14 @@ const dbConfigs = {
     user: process.env.MARIADB_USER,
     password: process.env.MARIADB_PASSWORD,
     database: process.env.MARIADB_DATABASE,
-    port: process.env.MARIADB_PORT || "3306", // Default MariaDB port is 3306
+    port: process.env.MARIADB_PORT || 3306, // Default MariaDB port is 3306
   },
   mssql: {
     user: process.env.MSSQL_USER || "root",
     password: process.env.MSSQL_PASSWORD,
     server: process.env.MSSQL_SERVER,
     database: process.env.MSSQL_DATABASE,
-    port: process.env.MSSQL_PORT || "1433", // Default MSSQL port is 1433
+    port: process.env.MSSQL_PORT || 1433, // Default MSSQL port is 1433
     // options: {
     //   encrypt: true, // For Azure SQL Database
     //   enableArithAbort: true,
