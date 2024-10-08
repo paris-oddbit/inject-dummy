@@ -313,17 +313,17 @@ async function generateCards(
 
     // Step 2: Generate card collection for bulk creation
     const cardsPerType = {
-      0: 1000, // 1000 cards of card_type id = 0
-      1: 1000, // 1000 cards of card_type id = 1
-      2: 1000, // 1000 cards of card_type id = 2
-      3: 1000, // 1000 cards of card_type id = 3
-      4: 1000, // 1000 cards of card_type id = 4
-      5: 1000, // 1000 cards of card_type id = 5
-      6: 1000, // 1000 cards of card_type id = 6
+      0: 500, // 1000 cards of card_type id = 0
+      1: 500, // 1000 cards of card_type id = 1
+      2: 500, // 1000 cards of card_type id = 2
+      3: 500, // 1000 cards of card_type id = 3
+      4: 500, // 1000 cards of card_type id = 4
+      5: 500, // 1000 cards of card_type id = 5
+      6: 500, // 1000 cards of card_type id = 6
       // // 7: 2, // 2 cards of card_type id = 7 //! NOT WORKING
-      8: 1000, // 1000 cards of card_type id = 8
-      9: 1000, // 1000 cards of card_type id = 9
-      10: 1000, // 1000 cards of card_type id = 10
+      8: 500, // 1000 cards of card_type id = 8
+      9: 500, // 1000 cards of card_type id = 9
+      10: 500, // 1000 cards of card_type id = 10
     };
     const cardCollection = generateCardCollection(cardsPerType, cardIdCounter);
 
@@ -346,10 +346,10 @@ async function generateCards(
 
 // Run the main process
 // First argument is the number of cards, second argument is whether to assign the cards to users
-const assignCards = true; // Change to 'false' for unassigned cards
-const blacklistCount = 5000; // Number of cards to blacklist
+const assignCards = false; // Change to 'false' for unassigned cards
+const blacklistCount = 5; // Number of cards to blacklist
 const concurrencyLimit = 5; // Limit for concurrent requests per batch
-let cardIdCounter = 2000400; // Start card ID
+let cardIdCounter = 500; // Start card ID
 
 generateCards(assignCards, blacklistCount, concurrencyLimit);
 

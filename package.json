@@ -11,8 +11,11 @@
   "description": "",
   "dependencies": {
     "@faker-js/faker": "^9.0.1",
+    "@types/mssql": "^9.1.5",
+    "@types/mysql": "^2.15.26",
     "axios": "^1.7.7",
     "dotenv": "^16.4.5",
+    "msnodesqlv8": "^4.2.1",
     "mssql": "^10.0.2",
     "mysql": "^2.18.1",
     "p-queue": "^8.0.1",
