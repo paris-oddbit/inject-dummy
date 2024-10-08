@@ -26,7 +26,7 @@ const dbConfigs = {
   mssql: {
     server: process.env.MSSQL_SERVER,
     database: process.env.MSSQL_DATABASE,
-    driver: 'msnodesqlv8',
+    driver: 'mssql',
     options: {
       port: parseInt(process.env.MSSQL_PORT, 10) || 1433, // Default MSSQL port is 1433
       trustedConnection: true,
@@ -73,10 +73,8 @@ const executeSqlFile = async (filePath, dbType) => {
     let result;
     switch (dbType) {
       case 'mssql':
-        // const pool = await mssql.connect(dbConfigs.mssql);
-        // const mssqlRequest = pool.Request();
-        // result = await mssqlRequest.query(sql);
-        result = await msnodesqlv8.query(connectionString, sql);
+        const mssqlRequest = new mssql.Request();
+        result = await mssqlRequest.query(sql);
         break;
       case 'mariadb':
         result = await new Promise((resolve, reject) => {
@@ -108,7 +106,9 @@ const executeSqlFile = async (filePath, dbType) => {
  */
 const runScript = async (scriptName, dbType) => {
   try {
-    const { stdout, stderr } = await execPromise(`node ${scriptName}`);
+    const { stdout, stderr } = await execPromise(
+      `node ${scriptName} ${dbType}`
+    );
     console.log(`Script output:`, stdout);
 
     if (stderr) {

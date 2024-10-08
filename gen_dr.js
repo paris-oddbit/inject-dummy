@@ -1,37 +1,44 @@
-const fs = require("fs");
+const fs = require('fs');
 
 const randomInt = (min, max) =>
   Math.floor(Math.random() * (max - min + 1) + min);
 
-function createInsertQuery(numRecords) {
+function createInsertQuery(numRecords, dbType) {
+  let genDate;
+  if (dbType === 'mariadb') {
+    genDate = 'NOW()';
+  } else {
+    genDate = 'GETDATE()';
+  }
+
   const baseQuery =
-    "INSERT INTO t_dr (NM, DSCR, DEL, DRGRUID, OPDRTSS, LSTMOD, LSTMODDT) VALUES ";
+    'INSERT INTO t_dr (NM, DSCR, DEL, DRGRUID, OPDRTSS, LSTMOD, LSTMODDT) VALUES ';
   let valuesList = [];
 
   for (let i = 1; i <= numRecords; i++) {
     const name = `Test Door ${i}`;
     const description = `Door generated from script ${i}`;
-    const delFlag = "N";
+    const delFlag = 'N';
     const drgruid = 1;
     const opdrtss = 3;
     const lstmod = 0;
     valuesList.push(
-      `('${name}', '${description}', '${delFlag}', ${drgruid}, ${opdrtss}, ${lstmod}, NOW())`
+      `('${name}', '${description}', '${delFlag}', ${drgruid}, ${opdrtss}, ${lstmod}, ${genDate})`
     );
   }
 
-  const fullQuery = baseQuery + valuesList.join(", ") + ";";
+  const fullQuery = baseQuery + valuesList.join(', ') + ';';
   return fullQuery;
 }
 
 // Generate SQL query for 1000 records
-const sqlQuery = createInsertQuery(1000);
+const sqlQuery = createInsertQuery(1000, process.argv[2]);
 
 // Write the generated SQL to a file
-fs.writeFile("add_t_dr.sql", sqlQuery, (err) => {
+fs.writeFile('add_t_dr.sql', sqlQuery, (err) => {
   if (err) {
-    console.error("Error writing to file:", err);
+    console.error('Error writing to file:', err);
   } else {
-    console.log("Successfully wrote SQL to file add_t_dr.sql");
+    console.log('Successfully wrote SQL to file add_t_dr.sql');
   }
 });

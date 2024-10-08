@@ -1,4 +1,4 @@
-const fs = require("fs");
+const fs = require('fs');
 
 // Helper function to generate random integers
 const randomInt = (min, max) =>
@@ -7,9 +7,18 @@ const randomInt = (min, max) =>
 // Helper function to generate random characters from specified options
 const randomChar = (options) => options[randomInt(0, options.length - 1)];
 
-function createInsertQuery(numRecords) {
+function createInsertQuery(numRecords, dbType) {
+  let genDate, lastUpdate;
+  if (dbType === 'mariadb') {
+    genDate = 'NOW()';
+    lastUpdate = `FROM_UNIXTIME(${lastUpdate})`;
+  } else {
+    genDate = 'GETDATE()';
+    lastUpdate = `DATEADD(SECOND, ${lastUpdate}, '1970-01-01')`;
+  }
+
   const baseQuery =
-    "INSERT INTO t_zn (NM, DSCR, TYP, ISGLB, LSTUDT, DEL, DELDT, STA, ENB) VALUES ";
+    'INSERT INTO t_zn (NM, DSCR, TYP, ISGLB, LSTUDT, DEL, DELDT, STA, ENB) VALUES ';
   let valuesList = [];
 
   for (let i = 1; i <= numRecords; i++) {
@@ -31,30 +40,30 @@ function createInsertQuery(numRecords) {
     ZONE_TYPE_OCCUPANCY_LIMIT = 0x0B,
     ZONE_TYPE_MAX_COUNT
     */
-    const isGlobal = "Y";
+    const isGlobal = 'Y';
     const lastUpdate = randomInt(1620000000, 1629999999); // Random Unix timestamp
-    const deleted = "N";
-    const deleteDate = deleted === "Y" ? "NOW()" : "NULL"; // Set delete date if deleted
+    const deleted = 'N';
+    const deleteDate = deleted === 'Y' ? genDate : 'NULL'; // Set delete date if deleted
     const status = 0;
-    const enabled = "Y";
+    const enabled = 'Y';
 
     valuesList.push(
-      `('${name}', '${description}', ${type}, '${isGlobal}', FROM_UNIXTIME(${lastUpdate}), '${deleted}', ${deleteDate}, ${status}, '${enabled}')`
+      `('${name}', '${description}', ${type}, '${isGlobal}', ${lastUpdate}, '${deleted}', ${deleteDate}, ${status}, '${enabled}')`
     );
   }
 
-  const fullQuery = baseQuery + valuesList.join(", ") + ";";
+  const fullQuery = baseQuery + valuesList.join(', ') + ';';
   return fullQuery;
 }
 
 // Generate SQL query for 1000 records
-const sqlQuery = createInsertQuery(1000);
+const sqlQuery = createInsertQuery(1000, process.argv[2]);
 
 // Write the generated SQL to a file
-fs.writeFile("add_t_zn.sql", sqlQuery, (err) => {
+fs.writeFile('add_t_zn.sql', sqlQuery, (err) => {
   if (err) {
-    console.error("Error writing to file:", err);
+    console.error('Error writing to file:', err);
   } else {
-    console.log("Successfully wrote SQL to file add_t_zn.sql");
+    console.log('Successfully wrote SQL to file add_t_zn.sql');
   }
 });
