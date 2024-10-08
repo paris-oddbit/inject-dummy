@@ -33,6 +33,7 @@ Open the .env file and update the following variables with your own values:
 - MSSQL_SERVER : The server for your MSSQL database.
 - MSSQL_DATABASE : The name of your MSSQL database.
 - MSSQL_PORT : The port for your MSSQL database.
+- WINDOWS_AUTH : Auth using windows auth (currently set to false as not supported yet).
 
 ### BioStar 2 Config
 

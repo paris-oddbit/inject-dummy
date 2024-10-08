@@ -34,24 +34,24 @@ const dbConfigs = {
       trustServerCertificate: true,
       // rowCollectionOnRequestCompletion: true, // Useful for large datasets
     },
-    // authentication:
-    //   process.env.WINDOWS_AUTH === 'true'
-    //     ? {
-    //         type: 'ntlm',
-    //         options: {
-    //           userName: process.env.USERNAME || '', // Retrieve username from environment variables or leave as empty string
-    //           password: '', // Empty password as Windows Auth doesn't require it
-    //           domain: process.env.USERDOMAIN || '', // Use current domain or leave empty
-    //           useWindowsAuthentication: true,
-    //         },
-    //       }
-    //     : {
-    //         type: 'default',
-    //         options: {
-    //           userName: process.env.MSSQL_USER || 'root',
-    //           password: process.env.MSSQL_PASSWORD,
-    //         },
-    //       },
+    authentication:
+      process.env.WINDOWS_AUTH === 'true' //!!! Windows Auth is not supported yet
+        ? {
+            type: 'ntlm',
+            options: {
+              userName: process.env.USERNAME || '', // Retrieve username from environment variables or leave as empty string
+              password: '', // Empty password as Windows Auth doesn't require it
+              domain: process.env.USERDOMAIN || '', // Use current domain or leave empty
+              useWindowsAuthentication: true,
+            },
+          }
+        : {
+            type: 'default',
+            options: {
+              userName: process.env.MSSQL_USER || 'root',
+              password: process.env.MSSQL_PASSWORD,
+            },
+          },
   },
 };
 
