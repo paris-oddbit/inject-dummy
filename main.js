@@ -5,55 +5,19 @@ const { exec } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
 require('dotenv').config();
-const msnodesqlv8 = require('msnodesqlv8');
+const config = require('./config');
+const logger = require('./utils/logger');
+const { promptForValidChoice } = require('./utils/validation');
+const ProgressTracker = require('./utils/progress');
+const { validateEnv } = require('./utils/envValidator');
+const { closeConnections } = require('./db');
 
 const fs = require('fs');
 
 const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
+    input: process.stdin,
+    output: process.stdout,
 });
-
-// Database credentials and configurations for both MySQL/MariaDB and MS SQL
-const dbConfigs = {
-  mariadb: {
-    host: process.env.MARIADB_HOST || 'root',
-    user: process.env.MARIADB_USER,
-    password: process.env.MARIADB_PASSWORD,
-    database: process.env.MARIADB_DATABASE,
-    port: process.env.MARIADB_PORT || 3306, // Default MariaDB port is 3306
-  },
-  mssql: {
-    server: process.env.MSSQL_SERVER,
-    database: process.env.MSSQL_DATABASE,
-    driver: 'mssql',
-    options: {
-      port: parseInt(process.env.MSSQL_PORT, 10) || 1433, // Default MSSQL port is 1433
-      trustedConnection: true,
-      enableArithAbort: true,
-      trustServerCertificate: true,
-      // rowCollectionOnRequestCompletion: true, // Useful for large datasets
-    },
-    authentication:
-      process.env.WINDOWS_AUTH === 'true' //!!! Windows Auth is not supported yet
-        ? {
-            type: 'ntlm',
-            options: {
-              userName: process.env.USERNAME || '', // Retrieve username from environment variables or leave as empty string
-              password: '', // Empty password as Windows Auth doesn't require it
-              domain: process.env.USERDOMAIN || '', // Use current domain or leave empty
-              useWindowsAuthentication: true,
-            },
-          }
-        : {
-            type: 'default',
-            options: {
-              userName: process.env.MSSQL_USER || 'root',
-              password: process.env.MSSQL_PASSWORD,
-            },
-          },
-  },
-};
 
 let connection; // This will store the database connection
 
@@ -64,37 +28,37 @@ let connection; // This will store the database connection
  * @param {string} dbType - The type of database where the SQL will be executed ('mssql' or 'mariadb').
  * @returns {Promise<Object|void>} A promise that resolves with the execution results for 'mariadb', or void for 'mssql'.
  */
-const executeSqlFile = async (filePath, dbType) => {
-  try {
-    const sql = await fs.promises.readFile(filePath, 'utf-8');
-    const connectionString =
-      'server=localhost;Database=test;Trusted_Connection=Yes;Driver={SQL Server Native Client 11.0}';
+const executeSqlFile = async(filePath, dbType) => {
+    try {
+        const sql = await fs.promises.readFile(filePath, 'utf-8');
+        const connectionString =
+            'server=localhost;Database=test;Trusted_Connection=Yes;Driver={SQL Server Native Client 11.0}';
 
-    let result;
-    switch (dbType) {
-      case 'mssql':
-        const mssqlRequest = new mssql.Request();
-        result = await mssqlRequest.query(sql);
-        break;
-      case 'mariadb':
-        result = await new Promise((resolve, reject) => {
-          connection.query(sql, (err, res) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(res);
-            }
-          });
-        });
-        break;
-      default:
-        throw new Error(`Database type ${dbType} is not supported`);
+        let result;
+        switch (dbType) {
+            case 'mssql':
+                const mssqlRequest = new mssql.Request();
+                result = await mssqlRequest.query(sql);
+                break;
+            case 'mariadb':
+                result = await new Promise((resolve, reject) => {
+                    connection.query(sql, (err, res) => {
+                        if (err) {
+                            reject(err);
+                        } else {
+                            resolve(res);
+                        }
+                    });
+                });
+                break;
+            default:
+                throw new Error(`Database type ${dbType} is not supported`);
+        }
+
+        console.log(`Executed ${filePath} successfully:`, result);
+    } catch (error) {
+        console.error(`Failed to execute SQL file ${filePath}:`, error);
     }
-
-    console.log(`Executed ${filePath} successfully:`, result);
-  } catch (error) {
-    console.error(`Failed to execute SQL file ${filePath}:`, error);
-  }
 };
 
 /**
@@ -104,26 +68,26 @@ const executeSqlFile = async (filePath, dbType) => {
  * @param {string} dbType - The target database type for SQL execution ('mssql' or 'mariadb').
  * @returns {Promise<void>} A promise that resolves upon successful execution of both scripts.
  */
-const runScript = async (scriptName, dbType) => {
-  try {
-    const { stdout, stderr } = await execPromise(
-      `node ${scriptName} ${dbType}`
-    );
-    console.log(`Script output:`, stdout);
+const runScript = async(scriptName, dbType) => {
+    try {
+        const { stdout, stderr } = await execPromise(
+            `node ${scriptName} ${dbType}`
+        );
+        console.log(`Script output:`, stdout);
 
-    if (stderr) {
-      console.error(`Script error:`, stderr);
-      return;
+        if (stderr) {
+            console.error(`Script error:`, stderr);
+            return;
+        }
+
+        // Build the SQL filename from the JavaScript script name
+        const sqlFilename = buildSqlFilename(scriptName);
+        console.log(`Executing SQL file: ${sqlFilename}`);
+
+        await executeSqlFile(sqlFilename, dbType);
+    } catch (error) {
+        console.error(`Execution error:`, error);
     }
-
-    // Build the SQL filename from the JavaScript script name
-    const sqlFilename = buildSqlFilename(scriptName);
-    console.log(`Executing SQL file: ${sqlFilename}`);
-
-    await executeSqlFile(sqlFilename, dbType);
-  } catch (error) {
-    console.error(`Execution error:`, error);
-  }
 };
 
 /**
@@ -133,56 +97,100 @@ const runScript = async (scriptName, dbType) => {
  * @returns {string} The built SQL filename.
  */
 const buildSqlFilename = (scriptName) => {
-  // Transform the script name to match the SQL naming convention
-  return `add_${scriptName.replace('gen_', 't_').replace('.js', '')}.sql`;
+    return `add_${scriptName.replace('gen_', 't_').replace('.js', '')}.sql`;
 };
 
 /**
  * Initializes the command-line interface to prompt the user for database configuration and script execution options.
  */
-rl.question(
-  'Choose DB Configuration:\n\n1 -> MariaDB\n2 -> MS SQL\n\nYour choice: ',
-  async (dbChoice) => {
-    const dbType = dbChoice.trim() === '1' ? 'mariadb' : 'mssql';
-    const dbConfig = dbConfigs[dbType];
-    console.log('DB Config:', dbConfig);
-
+const initializeInterface = async() => {
     try {
-      // Establish a connection to the chosen database
-      await connectToDatabase(dbType, dbConfig);
-      console.log(`Connected to ${dbType.toUpperCase()} server.`);
+        // Get database choice from user
+        const dbChoice = await promptForValidChoice(
+            rl,
+            'Choose DB Configuration:\n\n1 -> MariaDB\n2 -> MS SQL\n\nYour choice: ',
+            2
+        );
 
-      // Prompt the user for the desired operation
-      rl.question(
-        '\nChoose an option:\n1 -> Generate and Add Access Group\n2 -> Generate and Add Door\n3 -> Generate and Add Zone\n4 -> Generate and Add All\nYour choice: ',
-        async (option) => {
-          const scriptMap = {
-            1: 'gen_acsgr.js',
-            2: 'gen_dr.js',
-            3: 'gen_zn.js',
-          };
+        const dbType = dbChoice.trim() === '1' ? 'mariadb' : 'mssql';
 
-          const selectedScript = scriptMap[option.trim()] || null;
+        // Validate environment variables
+        validateEnv(dbType);
 
-          if (selectedScript) {
-            await runScript(selectedScript, dbType);
-          } else if (option.trim() === '4') {
-            await runScript('gen_acsgr.js', dbType);
-            await runScript('gen_dr.js', dbType);
-            await runScript('gen_zn.js', dbType);
-          } else {
-            console.log('Invalid choice!');
-          }
+        const dbConfig = config.databases[dbType];
+        logger.info(`Selected database configuration: ${dbType}`);
+        logger.debug('DB Config:', dbConfig);
 
-          rl.close();
+        // Establish database connection
+        await connectToDatabase(dbType, dbConfig);
+        logger.info(`Connected to ${dbType.toUpperCase()} server.`);
+
+        // Get operation choice from user
+        const option = await promptForValidChoice(
+            rl,
+            '\nChoose an option:\n1 -> Generate and Add Access Group\n2 -> Generate and Add Door\n3 -> Generate and Add Zone\n4 -> Generate and Add All\nYour choice: ',
+            4
+        );
+
+        const selectedScripts = config.scriptMap[option.trim()];
+
+        if (!selectedScripts) {
+            logger.error('Invalid choice! Please select options 1-4.');
+            process.exit(1);
+        } else if (Array.isArray(selectedScripts)) {
+            try {
+                logger.info('Starting execution of all scripts...');
+                for (const script of selectedScripts) {
+                    logger.info(`Executing ${script}...`);
+                    await runScript(script, dbType);
+                }
+                logger.info('All scripts executed successfully!');
+            } catch (error) {
+                logger.error(
+                    `Error executing multiple scripts: ${error.message}`,
+                    error
+                );
+                process.exit(1);
+            }
+        } else {
+            try {
+                logger.info(`Executing ${selectedScripts}...`);
+                await runScript(selectedScripts, dbType);
+                logger.info('Script executed successfully!');
+            } catch (error) {
+                logger.error(
+                    `Error executing script ${selectedScripts}: ${error.message}`,
+                    error
+                );
+                process.exit(1);
+            }
         }
-      );
-    } catch (err) {
-      console.error('Error connecting to the database:', err);
-      rl.close();
+    } catch (error) {
+        logger.error('Application error:', error);
+        process.exit(1);
+    } finally {
+        await closeConnections();
+        rl.close();
     }
-  }
-);
+};
+
+// Add process handlers for cleanup
+process.on('SIGINT', async() => {
+    logger.info('\nClosing database connections...');
+    await closeConnections();
+    process.exit(0);
+});
+
+process.on('unhandledRejection', (error) => {
+    logger.error('Unhandled Promise Rejection:', error);
+    process.exit(1);
+});
+
+// Start the application
+initializeInterface().catch((error) => {
+    logger.error('Fatal error:', error);
+    process.exit(1);
+});
 
 /**
  * Connects to the specified database using the provided configuration.
@@ -191,21 +199,21 @@ rl.question(
  * @param {Object} dbConfig - The configuration object for the database connection.
  * @returns {Promise<void>} A promise that resolves once the connection is established.
  */
-const connectToDatabase = async (dbType, dbConfig) => {
-  if (dbType === 'mssql') {
-    // Connect using MS SQL
-    await mssql.connect(dbConfig);
-  } else {
-    // Connect using MariaDB/MySQL
-    connection = mysql.createConnection(dbConfig);
-    connection.connect();
-  }
+const connectToDatabase = async(dbType, dbConfig) => {
+    if (dbType === 'mssql') {
+        // Connect using MS SQL
+        await mssql.connect(dbConfig);
+    } else {
+        // Connect using MariaDB/MySQL
+        connection = mysql.createConnection(dbConfig);
+        connection.connect();
+    }
 };
 rl.on('close', () => {
-  if (connection && connection.end) {
-    connection.end();
-  }
-  if (mssql && mssql.close) {
-    mssql.close();
-  }
+    if (connection && connection.end) {
+        connection.end();
+    }
+    if (mssql && mssql.close) {
+        mssql.close();
+    }
 });

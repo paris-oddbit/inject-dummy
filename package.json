@@ -15,6 +15,7 @@
     "@types/mysql": "^2.15.26",
     "axios": "^1.7.7",
     "dotenv": "^16.4.5",
+    "inject": "file:",
     "msnodesqlv8": "^4.2.1",
     "mssql": "^10.0.2",
     "mysql": "^2.18.1",

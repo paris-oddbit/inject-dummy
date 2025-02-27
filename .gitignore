@@ -131,3 +131,5 @@ dist
 
 # generated sql
 add*
+
+package-lock.json
